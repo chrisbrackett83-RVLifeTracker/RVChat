@@ -31,52 +31,78 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+function geminiModels(): string[] {
+  const preferred = process.env.GEMINI_MODEL?.trim();
+  const cascade = [
+    preferred,
+    "gemini-3.8-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
+  ].filter((m): m is string => Boolean(m));
+  return [...new Set(cascade)];
+}
+
+async function callGeminiModel(
+  prompt: string,
+  key: string,
+  model: string,
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 900 },
+    }),
+    signal: timeoutSignal(20_000),
+  });
+  if (res.status === 503 || res.status === 429) {
+    throw new Error(`Gemini error (${res.status}): high demand`);
+  }
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Gemini error (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text =
+    data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
+    "";
+  if (!text.trim()) throw new Error("Gemini returned an empty answer");
+  return text.trim();
+}
+
 async function callGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY!.trim();
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
-  const payload = {
-    system_instruction: { parts: [{ text: SYSTEM }] },
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 900 },
-  };
-
+  const models = geminiModels();
   let lastErr = "Gemini request failed";
-  // Keep retries short so the host doesn't time out with an HTML 502 page.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await sleep(600);
-    let res: Response;
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i]!;
+    if (i > 0) await sleep(400);
     try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: timeoutSignal(20_000),
-      });
+      return await callGeminiModel(prompt, key, model);
     } catch (err) {
-      lastErr =
-        err instanceof Error ? `Gemini request failed: ${err.message}` : lastErr;
-      continue;
+      const msg = err instanceof Error ? err.message : "Gemini request failed";
+      lastErr = `${msg} (model ${model})`;
+      // Capacity / not-found / unavailable → try next model
+      if (
+        /(?:503|429|404|high demand|UNAVAILABLE|not found|no longer available)/i.test(
+          msg,
+        )
+      ) {
+        continue;
+      }
+      throw err;
     }
-    if (res.status === 503 || res.status === 429) {
-      lastErr = `Gemini error (${res.status}): high demand`;
-      continue;
-    }
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Gemini error (${res.status}): ${body.slice(0, 200)}`);
-    }
-    const data = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text =
-      data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
-      "";
-    if (!text.trim()) throw new Error("Gemini returned an empty answer");
-    return text.trim();
   }
+
   throw new Error(
-    `${lastErr}. Gemini is busy — wait a minute and try again.`,
+    `${lastErr}. Gemini is busy — wait a minute and try again, or add an OPENAI_API_KEY fallback.`,
   );
 }
 
@@ -121,7 +147,25 @@ export async function generateAnswer(
   if (llm === "none") throw new Error("No LLM API key configured");
 
   const prompt = buildUserPrompt(question, rewritten, hits);
-  const answer = llm === "gemini" ? await callGemini(prompt) : await callOpenAI(prompt);
+  let answer: string;
+
+  if (llm === "gemini") {
+    try {
+      answer = await callGemini(prompt);
+    } catch (geminiErr) {
+      if (process.env.OPENAI_API_KEY?.trim()) {
+        try {
+          answer = await callOpenAI(prompt);
+        } catch {
+          throw geminiErr;
+        }
+      } else {
+        throw geminiErr;
+      }
+    }
+  } else {
+    answer = await callOpenAI(prompt);
+  }
 
   // Only expose http(s) URLs that were actually retrieved (citation honesty)
   const citations: Citation[] = [];
