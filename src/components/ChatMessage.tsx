@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChatMessage as Msg } from "@/lib/types";
+import { safeHttpUrl } from "@/lib/urls";
 import { SimpleMarkdown } from "./SimpleMarkdown";
 
 export function ChatMessageView({ message }: { message: Msg }) {
@@ -86,10 +87,19 @@ export function ChatMessageView({ message }: { message: Msg }) {
               gap: "0.55rem",
             }}
           >
-            {message.citations.map((c, i) => (
-              <li key={c.url + i} style={{ fontSize: "0.9rem", lineHeight: 1.4 }}>
+            {message.citations.map((c, i) => {
+              const href = safeHttpUrl(c.url);
+              if (!href) {
+                return (
+                  <li key={c.url + i} style={{ fontSize: "0.9rem", lineHeight: 1.4 }}>
+                    [{i + 1}] {c.title}
+                  </li>
+                );
+              }
+              return (
+              <li key={href + i} style={{ fontSize: "0.9rem", lineHeight: 1.4 }}>
                 <a
-                  href={c.url}
+                  href={href}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -102,7 +112,8 @@ export function ChatMessageView({ message }: { message: Msg }) {
                   [{i + 1}] {c.title}
                 </a>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

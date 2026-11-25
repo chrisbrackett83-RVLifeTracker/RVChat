@@ -40,9 +40,7 @@ export function ChatApp() {
           demoMode: true,
           llm: "none",
           search: "none",
-          missing: [
-            "Unable to reach status — open the live app signed into Cursor",
-          ],
+          missing: ["Unable to reach status — refresh while signed into Cursor"],
         }),
       );
   }, []);
@@ -82,7 +80,9 @@ export function ChatApp() {
         const msg =
           res.status === 401 || /sign.?in/i.test(raw)
             ? "Sign in to Cursor to use RV Chat."
-            : `Chat API returned a non-JSON response (${res.status}). Open https://rv-chat.apps.grok.bot while signed in, or refresh and try again.`;
+            : res.status === 502 || res.status === 504
+              ? "The chat service timed out or was overloaded. Wait a moment and try again."
+              : `Chat API returned an unexpected response (${res.status}). Refresh and try again.`;
         setError(msg);
         setMessages((m) => [
           ...m,
@@ -126,7 +126,7 @@ export function ChatApp() {
       ]);
     } catch {
       const msg =
-        "Could not reach the chat API. Use https://rv-chat.apps.grok.bot while signed into Cursor, then refresh.";
+        "Could not reach the chat API. Refresh this page while signed into Cursor and try again.";
       setError(msg);
       setMessages((m) => [
         ...m,

@@ -1,10 +1,31 @@
 import { getSearchApiKey, getSearchLimit, resolveSearchProvider } from "./config";
+import { timeoutSignal } from "./fetchTimeout";
 import type { SearchHit } from "./types";
+import { safeHttpUrl } from "./urls";
+
+const SEARCH_TIMEOUT_MS = 12_000;
+
+function mapHits(
+  rows: Array<{ title?: string; url?: string; snippet?: string }>,
+): SearchHit[] {
+  return rows
+    .map((r) => {
+      const url = safeHttpUrl(r.url);
+      if (!url) return null;
+      return {
+        title: r.title || url,
+        url,
+        snippet: r.snippet || "",
+      };
+    })
+    .filter((r): r is SearchHit => r !== null);
+}
 
 async function searchTavily(query: string, key: string, limit: number): Promise<SearchHit[]> {
   const res = await fetch("https://api.tavily.com/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal: timeoutSignal(SEARCH_TIMEOUT_MS),
     body: JSON.stringify({
       api_key: key,
       query,
@@ -19,13 +40,13 @@ async function searchTavily(query: string, key: string, limit: number): Promise<
   const data = (await res.json()) as {
     results?: Array<{ title?: string; url?: string; content?: string }>;
   };
-  return (data.results ?? [])
-    .filter((r) => r.url)
-    .map((r) => ({
-      title: r.title || r.url || "Source",
-      url: r.url!,
-      snippet: r.content || "",
-    }));
+  return mapHits(
+    (data.results ?? []).map((r) => ({
+      title: r.title,
+      url: r.url,
+      snippet: r.content,
+    })),
+  );
 }
 
 async function searchSerper(query: string, key: string, limit: number): Promise<SearchHit[]> {
@@ -35,6 +56,7 @@ async function searchSerper(query: string, key: string, limit: number): Promise<
       "Content-Type": "application/json",
       "X-API-KEY": key,
     },
+    signal: timeoutSignal(SEARCH_TIMEOUT_MS),
     body: JSON.stringify({ q: query, num: limit }),
   });
   if (!res.ok) {
@@ -43,13 +65,13 @@ async function searchSerper(query: string, key: string, limit: number): Promise<
   const data = (await res.json()) as {
     organic?: Array<{ title?: string; link?: string; snippet?: string }>;
   };
-  return (data.organic ?? [])
-    .filter((r) => r.link)
-    .map((r) => ({
-      title: r.title || r.link || "Source",
-      url: r.link!,
-      snippet: r.snippet || "",
-    }));
+  return mapHits(
+    (data.organic ?? []).map((r) => ({
+      title: r.title,
+      url: r.link,
+      snippet: r.snippet,
+    })),
+  );
 }
 
 async function searchBing(query: string, key: string, limit: number): Promise<SearchHit[]> {
@@ -58,6 +80,7 @@ async function searchBing(query: string, key: string, limit: number): Promise<Se
   url.searchParams.set("count", String(limit));
   const res = await fetch(url.toString(), {
     headers: { "Ocp-Apim-Subscription-Key": key },
+    signal: timeoutSignal(SEARCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`Bing search failed (${res.status})`);
@@ -65,13 +88,13 @@ async function searchBing(query: string, key: string, limit: number): Promise<Se
   const data = (await res.json()) as {
     webPages?: { value?: Array<{ name?: string; url?: string; snippet?: string }> };
   };
-  return (data.webPages?.value ?? [])
-    .filter((r) => r.url)
-    .map((r) => ({
-      title: r.name || r.url || "Source",
-      url: r.url!,
-      snippet: r.snippet || "",
-    }));
+  return mapHits(
+    (data.webPages?.value ?? []).map((r) => ({
+      title: r.name,
+      url: r.url,
+      snippet: r.snippet,
+    })),
+  );
 }
 
 async function searchBrave(query: string, key: string, limit: number): Promise<SearchHit[]> {
@@ -83,6 +106,7 @@ async function searchBrave(query: string, key: string, limit: number): Promise<S
       Accept: "application/json",
       "X-Subscription-Token": key,
     },
+    signal: timeoutSignal(SEARCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`Brave search failed (${res.status})`);
@@ -90,13 +114,13 @@ async function searchBrave(query: string, key: string, limit: number): Promise<S
   const data = (await res.json()) as {
     web?: { results?: Array<{ title?: string; url?: string; description?: string }> };
   };
-  return (data.web?.results ?? [])
-    .filter((r) => r.url)
-    .map((r) => ({
-      title: r.title || r.url || "Source",
-      url: r.url!,
-      snippet: r.description || "",
-    }));
+  return mapHits(
+    (data.web?.results ?? []).map((r) => ({
+      title: r.title,
+      url: r.url,
+      snippet: r.description,
+    })),
+  );
 }
 
 export async function webSearch(query: string): Promise<SearchHit[]> {

@@ -1,5 +1,7 @@
 import type { Citation, SearchHit } from "./types";
 import { resolveLlm } from "./config";
+import { timeoutSignal } from "./fetchTimeout";
+import { safeHttpUrl } from "./urls";
 
 const SYSTEM = `You are RV Chat, a personal assistant for RV owners, campers, and full-time RVers.
 Always interpret questions in an RV / camping / travel-trailer / motorhome context
@@ -40,15 +42,24 @@ async function callGemini(prompt: string): Promise<string> {
   };
 
   let lastErr = "Gemini request failed";
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await sleep(800 * attempt);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  // Keep retries short so the host doesn't time out with an HTML 502 page.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await sleep(600);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: timeoutSignal(20_000),
+      });
+    } catch (err) {
+      lastErr =
+        err instanceof Error ? `Gemini request failed: ${err.message}` : lastErr;
+      continue;
+    }
     if (res.status === 503 || res.status === 429) {
-      lastErr = `Gemini error (${res.status}): high demand — retrying`;
+      lastErr = `Gemini error (${res.status}): high demand`;
       continue;
     }
     if (!res.ok) {
@@ -78,6 +89,7 @@ async function callOpenAI(prompt: string): Promise<string> {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     },
+    signal: timeoutSignal(20_000),
     body: JSON.stringify({
       model,
       temperature: 0.3,
@@ -111,12 +123,17 @@ export async function generateAnswer(
   const prompt = buildUserPrompt(question, rewritten, hits);
   const answer = llm === "gemini" ? await callGemini(prompt) : await callOpenAI(prompt);
 
-  // Only expose URLs that were actually retrieved (citation honesty)
-  const citations: Citation[] = hits.slice(0, 5).map((h) => ({
-    title: h.title,
-    url: h.url,
-    snippet: h.snippet.slice(0, 180),
-  }));
+  // Only expose http(s) URLs that were actually retrieved (citation honesty)
+  const citations: Citation[] = [];
+  for (const h of hits.slice(0, 5)) {
+    const url = safeHttpUrl(h.url);
+    if (!url) continue;
+    citations.push({
+      title: h.title,
+      url,
+      snippet: h.snippet.slice(0, 180),
+    });
+  }
 
   return { answer, citations };
 }
