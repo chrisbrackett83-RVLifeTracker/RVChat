@@ -27,7 +27,7 @@ Write a helpful RV-focused answer with inline [n] citations. End with a short "S
 
 async function callGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY!.trim();
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const res = await fetch(url, {
     method: "POST",

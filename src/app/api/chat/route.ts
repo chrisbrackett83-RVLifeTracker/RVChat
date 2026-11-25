@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireIdentity } from "../../../../cursor/identity";
 import { getProviderStatus, getSearchLimit } from "@/lib/config";
 import { demoAnswer } from "@/lib/demo";
 import {
@@ -15,6 +16,9 @@ import type { ChatApiResponse } from "@/lib/types";
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const identity = await requireIdentity(req);
+  if (identity instanceof Response) return identity;
+
   const status = getProviderStatus();
 
   let body: { message?: string };
