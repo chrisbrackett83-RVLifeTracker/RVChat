@@ -14,12 +14,21 @@ import { webSearch } from "@/lib/search";
 import type { ChatApiResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const identity = await requireIdentity(req);
-  if (identity instanceof Response) return identity;
-
   const status = getProviderStatus();
+
+  const identity = await requireIdentity(req);
+  if (identity instanceof Response) {
+    // Always JSON so the browser UI never fails parsing HTML/error pages.
+    const res: ChatApiResponse = {
+      ok: false,
+      error: "Sign in to Cursor to use RV Chat.",
+      status,
+    };
+    return NextResponse.json(res, { status: 401 });
+  }
 
   let body: { message?: string };
   try {

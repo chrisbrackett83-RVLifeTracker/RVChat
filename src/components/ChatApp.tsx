@@ -25,15 +25,24 @@ export function ChatApp() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    fetch("/api/status")
-      .then((r) => r.json())
+    fetch("/api/status", { credentials: "same-origin" })
+      .then(async (r) => {
+        const raw = await r.text();
+        try {
+          return JSON.parse(raw) as ProviderStatus;
+        } catch {
+          throw new Error(`status ${r.status}`);
+        }
+      })
       .then((s: ProviderStatus) => setStatus(s))
       .catch(() =>
         setStatus({
           demoMode: true,
           llm: "none",
           search: "none",
-          missing: ["Unable to reach status endpoint"],
+          missing: [
+            "Unable to reach status — open the live app signed into Cursor",
+          ],
         }),
       );
   }, []);
@@ -60,21 +69,44 @@ export function ChatApp() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: q }),
       });
-      const data = (await res.json()) as ChatApiResponse;
-      setStatus(data.status);
+
+      const raw = await res.text();
+      let data: ChatApiResponse | null = null;
+      try {
+        data = JSON.parse(raw) as ChatApiResponse;
+      } catch {
+        const msg =
+          res.status === 401 || /sign.?in/i.test(raw)
+            ? "Sign in to Cursor to use RV Chat."
+            : `Chat API returned a non-JSON response (${res.status}). Open https://rv-chat.apps.grok.bot while signed in, or refresh and try again.`;
+        setError(msg);
+        setMessages((m) => [
+          ...m,
+          { id: uid(), role: "assistant", content: msg, demo: true },
+        ]);
+        return;
+      }
+
+      if (data.status) setStatus(data.status);
 
       if (!data.ok) {
-        setError(data.error);
+        const errText =
+          data.error ||
+          (res.status === 401
+            ? "Sign in to Cursor to use RV Chat."
+            : `Request failed (${res.status}).`);
+        setError(errText);
         setMessages((m) => [
           ...m,
           {
             id: uid(),
             role: "assistant",
-            content: data.error,
-            demo: data.status.demoMode,
+            content: errText,
+            demo: data.status?.demoMode,
           },
         ]);
         return;
@@ -94,7 +126,7 @@ export function ChatApp() {
       ]);
     } catch {
       const msg =
-        "Network error talking to the chat API. Is the dev server running?";
+        "Could not reach the chat API. Use https://rv-chat.apps.grok.bot while signed into Cursor, then refresh.";
       setError(msg);
       setMessages((m) => [
         ...m,

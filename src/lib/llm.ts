@@ -25,29 +25,48 @@ ${sources || "(none)"}
 Write a helpful RV-focused answer with inline [n] citations. End with a short "Sources" list repeating the used [n] titles.`;
 }
 
+async function sleep(ms: number) {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
 async function callGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY!.trim();
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM }] },
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 900 },
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Gemini error (${res.status}): ${body.slice(0, 200)}`);
-  }
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  const payload = {
+    system_instruction: { parts: [{ text: SYSTEM }] },
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.3, maxOutputTokens: 900 },
   };
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-  if (!text.trim()) throw new Error("Gemini returned an empty answer");
-  return text.trim();
+
+  let lastErr = "Gemini request failed";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(800 * attempt);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.status === 503 || res.status === 429) {
+      lastErr = `Gemini error (${res.status}): high demand — retrying`;
+      continue;
+    }
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Gemini error (${res.status}): ${body.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text =
+      data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
+      "";
+    if (!text.trim()) throw new Error("Gemini returned an empty answer");
+    return text.trim();
+  }
+  throw new Error(
+    `${lastErr}. Gemini is busy — wait a minute and try again.`,
+  );
 }
 
 async function callOpenAI(prompt: string): Promise<string> {
