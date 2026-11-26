@@ -3,7 +3,7 @@ import { timeoutSignal } from "./fetchTimeout";
 import type { SearchHit } from "./types";
 import { safeHttpUrl } from "./urls";
 
-const SEARCH_TIMEOUT_MS = 12_000;
+const SEARCH_TIMEOUT_MS = 10_000;
 
 function mapHits(
   rows: Array<{ title?: string; url?: string; snippet?: string }>,
@@ -131,16 +131,30 @@ export async function webSearch(query: string): Promise<SearchHit[]> {
   const key = getSearchApiKey(provider);
   const limit = Math.max(getSearchLimit(), 6); // fetch a few extra before ranking
 
-  switch (provider) {
-    case "tavily":
-      return searchTavily(query, key, limit);
-    case "serper":
-      return searchSerper(query, key, limit);
-    case "bing":
-      return searchBing(query, key, limit);
-    case "brave":
-      return searchBrave(query, key, limit);
-    default:
-      throw new Error(`Unsupported search provider: ${provider}`);
+  try {
+    switch (provider) {
+      case "tavily":
+        return await searchTavily(query, key, limit);
+      case "serper":
+        return await searchSerper(query, key, limit);
+      case "bing":
+        return await searchBing(query, key, limit);
+      case "brave":
+        return await searchBrave(query, key, limit);
+      default:
+        throw new Error(`Unsupported search provider: ${provider}`);
+    }
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.name === "TimeoutError" ||
+        err.name === "AbortError" ||
+        /aborted due to timeout|signal timed out/i.test(err.message))
+    ) {
+      throw new Error(
+        `Web search timed out (${provider}). Wait a moment and try again.`,
+      );
+    }
+    throw err;
   }
 }

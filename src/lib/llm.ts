@@ -10,6 +10,9 @@ Write concise, practical answers. Use ONLY the provided source URLs for citation
 never invent links. Cite sources inline as [1], [2], etc. matching the numbered list.
 If sources are thin, say what is uncertain. Do not republish entire manuals.`;
 
+const GEMINI_ATTEMPT_MS = 10_000;
+const OPENAI_ATTEMPT_MS = 15_000;
+
 function buildUserPrompt(question: string, rewritten: string, hits: SearchHit[]): string {
   const sources = hits
     .map(
@@ -31,16 +34,29 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+function isTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return (
+    err.name === "TimeoutError" ||
+    err.name === "AbortError" ||
+    /aborted due to timeout|signal timed out|AbortError/i.test(err.message)
+  );
+}
+
+function isRetryableGemini(msg: string): boolean {
+  return /(?:503|429|404|high demand|UNAVAILABLE|not found|no longer available|timed out|timeout|aborted)/i.test(
+    msg,
+  );
+}
+
+/** Prefer one primary + one alternate so total wait stays under host limits. */
 function geminiModels(): string[] {
-  const preferred = process.env.GEMINI_MODEL?.trim();
-  const cascade = [
-    preferred,
-    "gemini-3.8-flash",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-flash-latest",
-  ].filter((m): m is string => Boolean(m));
-  return [...new Set(cascade)];
+  const preferred = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
+  const alternate =
+    preferred === "gemini-2.5-flash-lite"
+      ? "gemini-2.5-flash"
+      : "gemini-2.5-flash-lite";
+  return [...new Set([preferred, alternate])];
 }
 
 async function callGeminiModel(
@@ -49,16 +65,24 @@ async function callGeminiModel(
   model: string,
 ): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM }] },
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 900 },
-    }),
-    signal: timeoutSignal(20_000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 700 },
+      }),
+      signal: timeoutSignal(GEMINI_ATTEMPT_MS),
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      throw new Error(`Gemini timed out after ${GEMINI_ATTEMPT_MS / 1000}s`);
+    }
+    throw err;
+  }
   if (res.status === 503 || res.status === 429) {
     throw new Error(`Gemini error (${res.status}): high demand`);
   }
@@ -83,49 +107,50 @@ async function callGemini(prompt: string): Promise<string> {
 
   for (let i = 0; i < models.length; i++) {
     const model = models[i]!;
-    if (i > 0) await sleep(400);
+    if (i > 0) await sleep(250);
     try {
       return await callGeminiModel(prompt, key, model);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Gemini request failed";
       lastErr = `${msg} (model ${model})`;
-      // Capacity / not-found / unavailable → try next model
-      if (
-        /(?:503|429|404|high demand|UNAVAILABLE|not found|no longer available)/i.test(
-          msg,
-        )
-      ) {
-        continue;
-      }
+      if (isRetryableGemini(msg)) continue;
       throw err;
     }
   }
 
   throw new Error(
-    `${lastErr}. Gemini is busy — wait a minute and try again, or add an OPENAI_API_KEY fallback.`,
+    `${lastErr}. The AI provider was slow or busy — wait a minute and try again, or add an OPENAI_API_KEY fallback.`,
   );
 }
 
 async function callOpenAI(prompt: string): Promise<string> {
   const key = process.env.OPENAI_API_KEY!.trim();
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    signal: timeoutSignal(20_000),
-    body: JSON.stringify({
-      model,
-      temperature: 0.3,
-      max_tokens: 900,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      signal: timeoutSignal(OPENAI_ATTEMPT_MS),
+      body: JSON.stringify({
+        model,
+        temperature: 0.3,
+        max_tokens: 700,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      throw new Error(`OpenAI timed out after ${OPENAI_ATTEMPT_MS / 1000}s`);
+    }
+    throw err;
+  }
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`OpenAI error (${res.status}): ${body.slice(0, 200)}`);
@@ -136,6 +161,16 @@ async function callOpenAI(prompt: string): Promise<string> {
   const text = data.choices?.[0]?.message?.content || "";
   if (!text.trim()) throw new Error("OpenAI returned an empty answer");
   return text.trim();
+}
+
+function friendlyUpstreamError(err: unknown): Error {
+  if (isTimeoutError(err)) {
+    return new Error(
+      "The AI took too long to respond. Wait a moment and try again.",
+    );
+  }
+  if (err instanceof Error) return err;
+  return new Error("Unexpected LLM error");
 }
 
 export async function generateAnswer(
@@ -157,14 +192,18 @@ export async function generateAnswer(
         try {
           answer = await callOpenAI(prompt);
         } catch {
-          throw geminiErr;
+          throw friendlyUpstreamError(geminiErr);
         }
       } else {
-        throw geminiErr;
+        throw friendlyUpstreamError(geminiErr);
       }
     }
   } else {
-    answer = await callOpenAI(prompt);
+    try {
+      answer = await callOpenAI(prompt);
+    } catch (err) {
+      throw friendlyUpstreamError(err);
+    }
   }
 
   // Only expose http(s) URLs that were actually retrieved (citation honesty)
