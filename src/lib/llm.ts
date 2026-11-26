@@ -52,10 +52,11 @@ function isRetryableGemini(msg: string): boolean {
 /** Prefer one primary + one alternate so total wait stays under host limits. */
 function geminiModels(): string[] {
   const preferred = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
+  // Keep cascade on currently offered models only (2.5-flash-lite is retired).
   const alternate =
-    preferred === "gemini-2.5-flash-lite"
-      ? "gemini-2.5-flash"
-      : "gemini-2.5-flash-lite";
+    preferred === "gemini-3.5-flash-lite"
+      ? "gemini-3.8-flash"
+      : "gemini-3.5-flash-lite";
   return [...new Set([preferred, alternate])];
 }
 
