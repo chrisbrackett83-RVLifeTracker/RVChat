@@ -91,7 +91,7 @@ const FALLBACK: DemoPack = {
   match: /.*/,
   answer: `**Demo mode** — no live LLM/search keys are configured, so this is a sample RV-context answer for UI testing.
 
-Your question was rewritten toward RV / camping / full-time travel-trailer use. With real keys, RV Chat would: rewrite the query → call a web search API → prefer trusted RV domains (Suburban, Dometic, Lippert, iRV2, manuals, etc.) → draft an answer with real source links.
+Your question was rewritten toward RV / camping / full-time travel-trailer use. With real keys, My RV Assistant would: rewrite the query → call a web search API → prefer trusted RV domains (Suburban, Dometic, Lippert, iRV2, manuals, etc.) → draft an answer with real source links.
 
 Add \`GEMINI_API_KEY\` (or \`OPENAI_API_KEY\`) plus a search key (\`TAVILY_API_KEY\` / \`SEARCH_API_KEY\`, etc.) to \`.env.local\` and restart the server for live answers.`,
   citations: [

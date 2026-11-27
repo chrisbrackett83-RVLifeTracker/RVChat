@@ -12,7 +12,7 @@ export async function GET(req: Request) {
         demoMode: true,
         llm: "none",
         search: "none",
-        missing: ["Sign in to Cursor to use RV Chat."],
+        missing: ["Sign in to Cursor to use My RV Assistant."],
       },
       { status: 401, headers: { "cache-control": "private, no-store" } },
     );

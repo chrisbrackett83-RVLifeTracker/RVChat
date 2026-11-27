@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       return jsonOk(
         {
           ok: false,
-          error: "Sign in to Cursor to use RV Chat.",
+          error: "Sign in to Cursor to use My RV Assistant.",
           status,
         },
         401,

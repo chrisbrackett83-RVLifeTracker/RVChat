@@ -79,7 +79,7 @@ export function ChatApp() {
       } catch {
         const msg =
           res.status === 401 || /sign.?in/i.test(raw)
-            ? "Sign in to Cursor to use RV Chat."
+            ? "Sign in to Cursor to use My RV Assistant."
             : res.status === 502 || res.status === 504
               ? "The chat service timed out or was overloaded. Wait a moment and try again."
               : `Chat API returned an unexpected response (${res.status}). Refresh and try again.`;
@@ -97,7 +97,7 @@ export function ChatApp() {
         const errText =
           data.error ||
           (res.status === 401
-            ? "Sign in to Cursor to use RV Chat."
+            ? "Sign in to Cursor to use My RV Assistant."
             : `Request failed (${res.status}).`);
         setError(errText);
         setMessages((m) => [
@@ -220,7 +220,7 @@ export function ChatApp() {
               transition: "font-size 0.35s ease",
             }}
           >
-            RV Chat
+            My RV Assistant
           </p>
           {!heroCollapsed && (
             <>

@@ -4,7 +4,7 @@ import { resolveLlm } from "./config";
 import { timeoutSignal } from "./fetchTimeout";
 import { safeHttpUrl } from "./urls";
 
-const SYSTEM = `You are RV Chat, a personal assistant for RV owners, campers, and full-time RVers.
+const SYSTEM = `You are My RV Assistant, a personal assistant for RV owners, campers, and full-time RVers.
 Always interpret questions in an RV / camping / travel-trailer / motorhome context
 (e.g. "suburban furnace" means Suburban RV furnace, not a residential home HVAC unit).
 Write concise, practical answers. Use ONLY the provided source URLs for citations—

@@ -15,7 +15,7 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: "RV Chat",
+  title: "My RV Assistant",
   description:
     "Personal RV and camping assistant with source-backed answers — for Chris Brackett.",
 };

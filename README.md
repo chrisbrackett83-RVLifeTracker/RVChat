@@ -1,4 +1,4 @@
-# RV Chat
+# My RV Assistant
 
 Personal-first RV / camping chatbot MVP for **Chris Brackett**.
 
