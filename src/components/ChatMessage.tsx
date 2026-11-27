@@ -60,7 +60,14 @@ export function ChatMessageView({ message }: { message: Msg }) {
             fontSize: isUser ? "0.98rem" : "1.02rem",
           }}
         >
-          {isUser ? message.content : <SimpleMarkdown text={message.content} />}
+          {isUser ? (
+            message.content
+          ) : (
+            <SimpleMarkdown
+              text={message.content}
+              citations={message.citations}
+            />
+          )}
         </div>
         {!isUser && message.disclaimer && (
           <p
@@ -84,36 +91,24 @@ export function ChatMessageView({ message }: { message: Msg }) {
               padding: "0.85rem 0 0",
               borderTop: "1px solid var(--line)",
               display: "grid",
-              gap: "0.55rem",
+              gap: "0.35rem",
             }}
           >
-            {message.citations.map((c, i) => {
-              const href = safeHttpUrl(c.url);
-              if (!href) {
-                return (
-                  <li key={c.url + i} style={{ fontSize: "0.9rem", lineHeight: 1.4 }}>
-                    [{i + 1}] {c.title}
-                  </li>
-                );
-              }
-              return (
-              <li key={href + i} style={{ fontSize: "0.9rem", lineHeight: 1.4 }}>
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "var(--pine)",
-                    fontWeight: 600,
-                    textDecoration: "underline",
-                    textUnderlineOffset: "3px",
-                  }}
-                >
-                  [{i + 1}] {c.title}
-                </a>
+            {message.citations.map((c, i) => (
+              <li
+                key={(safeHttpUrl(c.url) || c.url) + i}
+                style={{
+                  fontSize: "0.84rem",
+                  lineHeight: 1.4,
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <span style={{ fontWeight: 650, color: "var(--pine)" }}>
+                  [{i + 1}]
+                </span>{" "}
+                {c.title}
               </li>
-              );
-            })}
+            ))}
           </ul>
         )}
       </div>

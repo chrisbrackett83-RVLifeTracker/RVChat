@@ -1,23 +1,31 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { Citation } from "@/lib/types";
+import { safeHttpUrl } from "@/lib/urls";
 
-/** Minimal inline markdown: **bold**, _italic_, and [n] citation markers. */
-export function SimpleMarkdown({ text }: { text: string }) {
+/** Minimal inline markdown: **bold**, _italic_, and clickable [n] citation markers. */
+export function SimpleMarkdown({
+  text,
+  citations,
+}: {
+  text: string;
+  citations?: Citation[];
+}) {
   const lines = text.split("\n");
   return (
     <>
       {lines.map((line, li) => (
         <span key={li}>
           {li > 0 && "\n"}
-          {renderInline(line)}
+          {renderInline(line, citations)}
         </span>
       ))}
     </>
   );
 }
 
-function renderInline(line: string): ReactNode[] {
+function renderInline(line: string, citations?: Citation[]): ReactNode[] {
   const nodes: ReactNode[] = [];
   const re = /(\*\*[^*]+\*\*|_[^_]+_|\[[0-9]+\])/g;
   let last = 0;
@@ -31,11 +39,39 @@ function renderInline(line: string): ReactNode[] {
     } else if (token.startsWith("_") && token.endsWith("_")) {
       nodes.push(<em key={`e${i++}`}>{token.slice(1, -1)}</em>);
     } else {
-      nodes.push(
-        <span key={`c${i++}`} style={{ fontWeight: 650, color: "var(--pine)" }}>
-          {token}
-        </span>,
-      );
+      const n = Number(token.slice(1, -1));
+      const cite = citations?.[n - 1];
+      const href = cite ? safeHttpUrl(cite.url) : null;
+      if (href) {
+        nodes.push(
+          <a
+            key={`c${i++}`}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={cite?.title || `Source ${n}`}
+            style={{
+              fontWeight: 700,
+              color: "var(--pine)",
+              textDecoration: "none",
+              padding: "0 0.12em",
+              borderRadius: "0.3em",
+              background: "rgba(20, 61, 49, 0.08)",
+            }}
+          >
+            {token}
+          </a>,
+        );
+      } else {
+        nodes.push(
+          <span
+            key={`c${i++}`}
+            style={{ fontWeight: 650, color: "var(--pine)" }}
+          >
+            {token}
+          </span>,
+        );
+      }
     }
     last = m.index + token.length;
   }
