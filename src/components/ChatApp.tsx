@@ -153,32 +153,19 @@ export function ChatApp() {
         overflow: "hidden",
       }}
     >
-      {/* Atmospheric layers */}
       <div
         aria-hidden
         className="glow-orb"
         style={{
           position: "absolute",
-          width: 420,
-          height: 420,
+          width: 480,
+          height: 480,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(110,168,192,0.55), transparent 70%)",
-          top: "-8%",
-          left: "-6%",
-          filter: "blur(8px)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        aria-hidden
-        className="trail-band"
-        style={{
-          position: "absolute",
-          inset: "auto 0 18% 0",
-          height: 120,
-          background:
-            "linear-gradient(90deg, transparent, rgba(31,92,72,0.08), transparent)",
+            "radial-gradient(circle, rgba(59,130,246,0.18), transparent 68%)",
+          top: "-12%",
+          right: "-8%",
+          filter: "blur(6px)",
           pointerEvents: "none",
         }}
       />
@@ -209,84 +196,32 @@ export function ChatApp() {
           <p
             style={{
               margin: 0,
-              fontFamily: "var(--font-display)",
               fontSize: heroCollapsed
-                ? "clamp(1.6rem, 4vw, 2rem)"
-                : "clamp(3.2rem, 10vw, 5.4rem)",
-              fontWeight: 600,
-              letterSpacing: "-0.03em",
-              lineHeight: 0.95,
-              color: "var(--pine-deep)",
+                ? "clamp(1.35rem, 3.5vw, 1.75rem)"
+                : "clamp(2rem, 6vw, 2.75rem)",
+              fontWeight: 700,
+              letterSpacing: "-0.025em",
+              lineHeight: 1.15,
+              color: "var(--brand-900)",
               transition: "font-size 0.35s ease",
             }}
           >
             My RV Assistant
           </p>
           {!heroCollapsed && (
-            <>
-              <p
-                className="animate-rise-delay"
-                style={{
-                  margin: "1.1rem auto 0",
-                  maxWidth: "28rem",
-                  fontSize: "1.08rem",
-                  lineHeight: 1.5,
-                  color: "var(--ink-soft)",
-                }}
-              >
-                Ask anything—every answer stays in RV and camping context, with
-                sources you can open.
-              </p>
-              <div
-                aria-hidden
-                className="animate-rise-late"
-                style={{
-                  margin: "1.75rem auto 0",
-                  width: "min(100%, 520px)",
-                  height: "clamp(140px, 22vh, 220px)",
-                  borderRadius: 24,
-                  background:
-                    "linear-gradient(160deg, rgba(110,168,192,0.55) 0%, rgba(31,92,72,0.35) 45%, rgba(20,61,49,0.55) 100%), radial-gradient(circle at 30% 40%, rgba(255,255,255,0.35), transparent 55%)",
-                  boxShadow: "var(--shadow)",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: "auto 8% 18% 8%",
-                    height: 18,
-                    borderRadius: 999,
-                    background: "rgba(26,47,40,0.2)",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    left: "18%",
-                    bottom: "28%",
-                    width: "42%",
-                    height: 54,
-                    borderRadius: "10px 14px 8px 8px",
-                    background: "rgba(243,247,245,0.88)",
-                    boxShadow: "0 8px 20px rgba(20,61,49,0.18)",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    right: "16%",
-                    top: "28%",
-                    width: 70,
-                    height: 70,
-                    borderRadius: "50%",
-                    background: "rgba(255,236,180,0.55)",
-                    filter: "blur(2px)",
-                  }}
-                />
-              </div>
-            </>
+            <p
+              className="animate-rise-delay"
+              style={{
+                margin: "0.85rem auto 0",
+                maxWidth: "28rem",
+                fontSize: "1.05rem",
+                lineHeight: 1.55,
+                color: "var(--ink-soft)",
+              }}
+            >
+              Ask anything—every answer stays in RV and camping context, with
+              sources you can open.
+            </p>
           )}
         </header>
 
@@ -301,7 +236,7 @@ export function ChatApp() {
             }}
           >
             Running in{" "}
-            <strong style={{ color: "var(--pine)", fontWeight: 650 }}>
+            <strong style={{ color: "var(--brand-700)", fontWeight: 650 }}>
               demo mode
             </strong>
             {status.missing.length > 0
@@ -340,15 +275,16 @@ export function ChatApp() {
                   type="button"
                   onClick={() => void ask(s)}
                   style={{
-                    border: "1px solid var(--line)",
-                    background: "rgba(243,247,245,0.72)",
+                    border: "1px solid #e5e7eb",
+                    background: "#fff",
                     color: "var(--ink-soft)",
                     borderRadius: 999,
                     padding: "0.55rem 0.95rem",
                     fontFamily: "inherit",
-                    fontSize: "0.9rem",
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
                     cursor: "pointer",
-                    backdropFilter: "blur(6px)",
+                    boxShadow: "0 1px 2px rgb(0 0 0 / 0.05)",
                   }}
                 >
                   {s}
@@ -382,7 +318,7 @@ export function ChatApp() {
           zIndex: 2,
           padding: "0.85rem 1.25rem 1.25rem",
           background:
-            "linear-gradient(180deg, rgba(243,247,245,0), rgba(243,247,245,0.92) 35%, rgba(227,236,231,0.96))",
+            "linear-gradient(180deg, rgba(249,250,251,0), rgba(249,250,251,0.95) 40%, #f9fafb)",
         }}
       >
         <form
@@ -394,12 +330,11 @@ export function ChatApp() {
             gridTemplateColumns: "1fr auto",
             gap: "0.65rem",
             alignItems: "end",
-            padding: "0.65rem",
-            borderRadius: 22,
-            background: "rgba(255,255,255,0.78)",
-            border: "1px solid var(--line)",
+            padding: "0.75rem",
+            borderRadius: 16,
+            background: "#fff",
+            border: "1px solid #e5e7eb",
             boxShadow: "var(--shadow)",
-            backdropFilter: "blur(10px)",
           }}
         >
           <textarea
@@ -433,14 +368,12 @@ export function ChatApp() {
             disabled={busy || !input.trim()}
             style={{
               border: "none",
-              borderRadius: 14,
+              borderRadius: 12,
               padding: "0.85rem 1.15rem",
-              background: busy
-                ? "var(--sage)"
-                : "linear-gradient(145deg, var(--accent), var(--pine-deep))",
-              color: "#f7fbf9",
+              background: busy ? "#93c5fd" : "var(--brand-600)",
+              color: "#fff",
               fontFamily: "inherit",
-              fontWeight: 650,
+              fontWeight: 600,
               fontSize: "0.95rem",
               cursor: busy || !input.trim() ? "not-allowed" : "pointer",
               opacity: !input.trim() ? 0.55 : 1,
