@@ -147,8 +147,8 @@ export function ChatApp() {
     <div
       style={{
         minHeight: "100dvh",
-        display: "grid",
-        gridTemplateRows: "1fr auto",
+        display: "flex",
+        flexDirection: "column",
         position: "relative",
         overflow: "hidden",
       }}
@@ -175,17 +175,17 @@ export function ChatApp() {
           width: "min(920px, 100%)",
           margin: "0 auto",
           padding: heroCollapsed
-            ? "1.25rem 1.25rem 0"
-            : "clamp(2rem, 8vh, 4.5rem) 1.25rem 0",
+            ? "1.25rem 1.25rem 1.5rem"
+            : "clamp(2rem, 8vh, 4.5rem) 1.25rem 1.5rem",
           display: "flex",
           flexDirection: "column",
-          gap: heroCollapsed ? "1rem" : "1.75rem",
+          gap: heroCollapsed ? "1rem" : "1.35rem",
           position: "relative",
           zIndex: 1,
+          flex: 1,
           minHeight: 0,
         }}
       >
-        {/* Brand-first hero composition */}
         <header
           className="animate-rise"
           style={{
@@ -224,6 +224,81 @@ export function ChatApp() {
             </p>
           )}
         </header>
+
+        <div className="animate-rise-delay">
+          <form
+            onSubmit={onSubmit}
+            style={{
+              width: "100%",
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: "0.65rem",
+              alignItems: "end",
+              padding: "0.75rem",
+              borderRadius: 16,
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              boxShadow: "var(--shadow)",
+            }}
+          >
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void ask(input);
+                }
+              }}
+              rows={2}
+              placeholder="Ask about furnaces, slides, shore power, boondocking…"
+              disabled={busy}
+              aria-label="Your RV question"
+              style={{
+                resize: "none",
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontFamily: "inherit",
+                fontSize: "1rem",
+                lineHeight: 1.45,
+                color: "var(--ink)",
+                padding: "0.45rem 0.55rem",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              style={{
+                border: "none",
+                borderRadius: 12,
+                padding: "0.85rem 1.15rem",
+                background: busy ? "#93c5fd" : "var(--brand-600)",
+                color: "#fff",
+                fontFamily: "inherit",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                cursor: busy || !input.trim() ? "not-allowed" : "pointer",
+                opacity: !input.trim() ? 0.55 : 1,
+              }}
+            >
+              Ask
+            </button>
+          </form>
+          {error && (
+            <p
+              role="alert"
+              style={{
+                margin: "0.55rem 0 0",
+                fontSize: "0.85rem",
+                color: "var(--accent-hot)",
+              }}
+            >
+              {error}
+            </p>
+          )}
+        </div>
 
         {status?.demoMode && (
           <p
@@ -309,96 +384,10 @@ export function ChatApp() {
             </p>
           )}
         </section>
-      </main>
 
-      <footer
-        style={{
-          position: "sticky",
-          bottom: 0,
-          zIndex: 2,
-          padding: "0.85rem 1.25rem 1.25rem",
-          background:
-            "linear-gradient(180deg, rgba(249,250,251,0), rgba(249,250,251,0.95) 40%, #f9fafb)",
-        }}
-      >
-        <form
-          onSubmit={onSubmit}
-          style={{
-            width: "min(920px, 100%)",
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: "0.65rem",
-            alignItems: "end",
-            padding: "0.75rem",
-            borderRadius: 16,
-            background: "#fff",
-            border: "1px solid #e5e7eb",
-            boxShadow: "var(--shadow)",
-          }}
-        >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void ask(input);
-              }
-            }}
-            rows={2}
-            placeholder="Ask about furnaces, slides, shore power, boondocking…"
-            disabled={busy}
-            aria-label="Your RV question"
-            style={{
-              resize: "none",
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              fontFamily: "inherit",
-              fontSize: "1rem",
-              lineHeight: 1.45,
-              color: "var(--ink)",
-              padding: "0.45rem 0.55rem",
-            }}
-          />
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            style={{
-              border: "none",
-              borderRadius: 12,
-              padding: "0.85rem 1.15rem",
-              background: busy ? "#93c5fd" : "var(--brand-600)",
-              color: "#fff",
-              fontFamily: "inherit",
-              fontWeight: 600,
-              fontSize: "0.95rem",
-              cursor: busy || !input.trim() ? "not-allowed" : "pointer",
-              opacity: !input.trim() ? 0.55 : 1,
-            }}
-          >
-            Ask
-          </button>
-        </form>
-        {error && (
-          <p
-            role="alert"
-            style={{
-              width: "min(920px, 100%)",
-              margin: "0.55rem auto 0",
-              fontSize: "0.85rem",
-              color: "var(--accent-hot)",
-            }}
-          >
-            {error}
-          </p>
-        )}
         <p
           style={{
-            width: "min(920px, 100%)",
-            margin: "0.55rem auto 0",
+            margin: "0.25rem 0 0",
             fontSize: "0.75rem",
             color: "var(--ink-soft)",
             textAlign: "center",
@@ -408,7 +397,7 @@ export function ChatApp() {
           Personal MVP for Chris Brackett · not affiliated with RVLifeTracker ·
           electrical / propane / brake tips need a pro
         </p>
-      </footer>
+      </main>
     </div>
   );
 }
