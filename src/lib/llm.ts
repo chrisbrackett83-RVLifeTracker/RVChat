@@ -1,4 +1,5 @@
 import type { Citation, SearchHit } from "./types";
+import { stripTrailingSourcesSection } from "./citations";
 import { resolveLlm } from "./config";
 import { timeoutSignal } from "./fetchTimeout";
 import { safeHttpUrl } from "./urls";
@@ -8,7 +9,8 @@ Always interpret questions in an RV / camping / travel-trailer / motorhome conte
 (e.g. "suburban furnace" means Suburban RV furnace, not a residential home HVAC unit).
 Write concise, practical answers. Use ONLY the provided source URLs for citations—
 never invent links. Cite sources inline as [1], [2], etc. matching the numbered list.
-If sources are thin, say what is uncertain. Do not republish entire manuals.`;
+If sources are thin, say what is uncertain. Do not republish entire manuals.
+Do NOT append a Sources / References list at the end — cite inline only.`;
 
 const GEMINI_ATTEMPT_MS = 10_000;
 const OPENAI_ATTEMPT_MS = 15_000;
@@ -24,10 +26,10 @@ function buildUserPrompt(question: string, rewritten: string, hits: SearchHit[])
   return `User question: ${question}
 RV-context search query used: ${rewritten}
 
-Sources (cite only these URLs):
+Sources (cite only these URLs, using matching [n] markers inline):
 ${sources || "(none)"}
 
-Write a helpful RV-focused answer with inline [n] citations. End with a short "Sources" list repeating the used [n] titles.`;
+Write a helpful RV-focused answer with inline [n] citations only. Do not add a Sources list at the end.`;
 }
 
 async function sleep(ms: number) {
@@ -207,7 +209,9 @@ export async function generateAnswer(
     }
   }
 
-  // Only expose http(s) URLs that were actually retrieved (citation honesty)
+  answer = stripTrailingSourcesSection(answer);
+
+  // Keep slots aligned with [n] from the retrieved hit list (citation honesty)
   const citations: Citation[] = [];
   for (const h of hits.slice(0, 5)) {
     const url = safeHttpUrl(h.url);

@@ -1,11 +1,15 @@
 "use client";
 
+import { displayCitations } from "@/lib/citations";
 import type { ChatMessage as Msg } from "@/lib/types";
 import { safeHttpUrl } from "@/lib/urls";
 import { SimpleMarkdown } from "./SimpleMarkdown";
 
 export function ChatMessageView({ message }: { message: Msg }) {
   const isUser = message.role === "user";
+  const usedCitations = isUser
+    ? []
+    : displayCitations(message.content, message.citations || []);
 
   return (
     <article
@@ -83,7 +87,7 @@ export function ChatMessageView({ message }: { message: Msg }) {
             {message.disclaimer}
           </p>
         )}
-        {!isUser && message.citations && message.citations.length > 0 && (
+        {!isUser && usedCitations.length > 0 && (
           <ul
             style={{
               listStyle: "none",
@@ -94,9 +98,9 @@ export function ChatMessageView({ message }: { message: Msg }) {
               gap: "0.35rem",
             }}
           >
-            {message.citations.map((c, i) => (
+            {usedCitations.map(({ index, citation: c }) => (
               <li
-                key={(safeHttpUrl(c.url) || c.url) + i}
+                key={(safeHttpUrl(c.url) || c.url) + index}
                 style={{
                   fontSize: "0.84rem",
                   lineHeight: 1.4,
@@ -104,7 +108,7 @@ export function ChatMessageView({ message }: { message: Msg }) {
                 }}
               >
                 <span style={{ fontWeight: 650, color: "var(--pine)" }}>
-                  [{i + 1}]
+                  [{index}]
                 </span>{" "}
                 {c.title}
               </li>
