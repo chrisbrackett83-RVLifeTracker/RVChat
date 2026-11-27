@@ -9,7 +9,10 @@ Always interpret questions in an RV / camping / travel-trailer / motorhome conte
 (e.g. "suburban furnace" means Suburban RV furnace, not a residential home HVAC unit).
 Write concise, practical answers. Use ONLY the provided source URLs for citations—
 never invent links. Cite sources inline as [1], [2], etc. matching the numbered list.
-If sources are thin, say what is uncertain. Do not republish entire manuals.
+Prefer earlier/higher-ranked sources when they are informative; favor detailed manufacturer
+or website pages over thin social posts, but cite a rich forum/social writeup when it
+clearly beats a sparse page. If sources are thin, say what is uncertain.
+Do not republish entire manuals.
 Do NOT append a Sources / References list at the end — cite inline only.`;
 
 const GEMINI_ATTEMPT_MS = 10_000;
