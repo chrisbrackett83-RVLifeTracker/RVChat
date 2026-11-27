@@ -23,12 +23,12 @@ export function ChatMessageView({ message }: { message: Msg }) {
       <div
         style={{
           padding: isUser ? "0.85rem 1.05rem" : "0",
-          borderRadius: isUser ? "18px 18px 6px 18px" : 0,
-          background: isUser
-            ? "linear-gradient(145deg, var(--pine) 0%, var(--pine-deep) 100%)"
-            : "transparent",
-          color: isUser ? "#f4faf7" : "var(--ink)",
-          boxShadow: isUser ? "0 10px 28px rgba(20, 61, 49, 0.22)" : "none",
+          borderRadius: isUser ? "1rem 1rem 0.35rem 1rem" : 0,
+          background: isUser ? "var(--brand-600)" : "transparent",
+          color: isUser ? "#fff" : "var(--ink)",
+          boxShadow: isUser
+            ? "0 10px 15px -3px rgb(37 99 235 / 0.25)"
+            : "none",
         }}
       >
         {!isUser && message.demo && (

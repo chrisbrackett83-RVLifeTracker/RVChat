@@ -52,11 +52,11 @@ function renderInline(line: string, citations?: Citation[]): ReactNode[] {
             title={cite?.title || `Source ${n}`}
             style={{
               fontWeight: 700,
-              color: "var(--pine)",
+              color: "var(--brand-700)",
               textDecoration: "none",
               padding: "0 0.12em",
               borderRadius: "0.3em",
-              background: "rgba(20, 61, 49, 0.08)",
+              background: "var(--brand-100)",
             }}
           >
             {token}
