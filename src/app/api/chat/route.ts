@@ -10,12 +10,15 @@ import {
 import { generateAnswer } from "@/lib/llm";
 import { rankAndCap } from "@/lib/rank";
 import { takeRateLimit } from "@/lib/rateLimit";
-import { rewriteQueryForRv } from "@/lib/rewrite";
+import { rewriteQueryWithHistory } from "@/lib/rewrite";
 import { webSearch } from "@/lib/search";
-import type { ChatApiResponse } from "@/lib/types";
+import type { ChatApiResponse, ChatHistoryTurn } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+const MAX_HISTORY_TURNS = 8;
+const MAX_HISTORY_CONTENT = 1500;
 
 function jsonOk(body: ChatApiResponse, status = 200) {
   // Prefer HTTP 200 for app-level failures so the host doesn't replace the
@@ -24,6 +27,23 @@ function jsonOk(body: ChatApiResponse, status = 200) {
     status,
     headers: { "cache-control": "private, no-store" },
   });
+}
+
+function sanitizeHistory(raw: unknown): ChatHistoryTurn[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ChatHistoryTurn[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const role = (item as { role?: string }).role;
+    const content = (item as { content?: string }).content;
+    if (role !== "user" && role !== "assistant") continue;
+    if (typeof content !== "string") continue;
+    const trimmed = content.trim().slice(0, MAX_HISTORY_CONTENT);
+    if (!trimmed) continue;
+    out.push({ role, content: trimmed });
+    if (out.length >= MAX_HISTORY_TURNS) break;
+  }
+  return out;
 }
 
 export async function POST(req: Request) {
@@ -51,9 +71,9 @@ export async function POST(req: Request) {
       });
     }
 
-    let body: { message?: string };
+    let body: { message?: string; history?: unknown };
     try {
-      body = (await req.json()) as { message?: string };
+      body = (await req.json()) as { message?: string; history?: unknown };
     } catch {
       return jsonOk(
         {
@@ -84,13 +104,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const history = sanitizeHistory(body.history);
+    const rewrittenQuery = rewriteQueryWithHistory(message, history);
+
     const guard = softGuardrailNote(message);
     if (guard) {
       return jsonOk({
         ok: true,
         answer: guard,
         citations: [],
-        rewrittenQuery: rewriteQueryForRv(message),
+        rewrittenQuery,
         demo: status.demoMode,
         disclaimer: null,
         status,
@@ -99,28 +122,32 @@ export async function POST(req: Request) {
 
     if (status.demoMode) {
       const demo = demoAnswer(message);
+      const followHint =
+        history.length > 0
+          ? `\n\n_(Follow-up noted against your earlier question — live mode would re-search with that context.)_`
+          : "";
       const missingHint =
         status.missing.length > 0
           ? `\n\n_Missing for live mode: ${status.missing.join("; ")}. Add keys in Cursor app secrets and republish._`
           : "";
       return jsonOk({
         ok: true,
-        answer: `${demo.answer}${missingHint}`,
+        answer: `${demo.answer}${followHint}${missingHint}`,
         citations: demo.citations,
-        rewrittenQuery: demo.rewrittenQuery,
+        rewrittenQuery,
         demo: true,
         disclaimer: demo.disclaimer,
         status,
       });
     }
 
-    const rewrittenQuery = rewriteQueryForRv(message);
     const rawHits = await webSearch(rewrittenQuery);
     const hits = rankAndCap(rawHits, getSearchLimit());
     const { answer, citations } = await generateAnswer(
       message,
       rewrittenQuery,
       hits,
+      history,
     );
     const disclaimer = needsSafetyDisclaimer(message, answer)
       ? SAFETY_DISCLAIMER

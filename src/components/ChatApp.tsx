@@ -2,7 +2,12 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ChatMessageView } from "./ChatMessage";
-import type { ChatApiResponse, ChatMessage, ProviderStatus } from "@/lib/types";
+import type {
+  ChatApiResponse,
+  ChatHistoryTurn,
+  ChatMessage,
+  ProviderStatus,
+} from "@/lib/types";
 
 const SUGGESTIONS = [
   "suburban furnace diagram",
@@ -17,12 +22,14 @@ function uid() {
 export function ChatApp() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [followUp, setFollowUp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [heroCollapsed, setHeroCollapsed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const followUpRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     fetch("/api/status", { credentials: "same-origin" })
@@ -52,14 +59,22 @@ export function ChatApp() {
     });
   }, [messages, busy]);
 
-  async function ask(question: string) {
+  const hasAssistantReply = messages.some((m) => m.role === "assistant");
+
+  async function ask(question: string, opts?: { followUp?: boolean }) {
     const q = question.trim();
     if (!q || busy) return;
+
+    const history: ChatHistoryTurn[] = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
     setHeroCollapsed(true);
     setError(null);
     setBusy(true);
-    setInput("");
+    if (opts?.followUp) setFollowUp("");
+    else setInput("");
 
     const userMsg: ChatMessage = { id: uid(), role: "user", content: q };
     setMessages((m) => [...m, userMsg]);
@@ -69,7 +84,10 @@ export function ChatApp() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: q }),
+        body: JSON.stringify({
+          message: q,
+          history: history.length > 0 ? history : undefined,
+        }),
       });
 
       const raw = await res.text();
@@ -134,7 +152,8 @@ export function ChatApp() {
       ]);
     } finally {
       setBusy(false);
-      inputRef.current?.focus();
+      if (opts?.followUp) followUpRef.current?.focus();
+      else inputRef.current?.focus();
     }
   }
 
@@ -142,6 +161,45 @@ export function ChatApp() {
     e.preventDefault();
     void ask(input);
   }
+
+  function onFollowUpSubmit(e: FormEvent) {
+    e.preventDefault();
+    void ask(followUp, { followUp: true });
+  }
+
+  function startNewQuestion() {
+    setMessages([]);
+    setFollowUp("");
+    setInput("");
+    setError(null);
+    setHeroCollapsed(false);
+    inputRef.current?.focus();
+  }
+
+  const composerStyle = {
+    width: "100%" as const,
+    display: "grid" as const,
+    gridTemplateColumns: "1fr auto",
+    gap: "0.65rem",
+    alignItems: "end" as const,
+    padding: "0.75rem",
+    borderRadius: 16,
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow)",
+  };
+
+  const textareaStyle = {
+    resize: "none" as const,
+    border: "none",
+    outline: "none",
+    background: "transparent",
+    fontFamily: "inherit",
+    fontSize: "1rem",
+    lineHeight: 1.45,
+    color: "var(--ink)",
+    padding: "0.45rem 0.55rem",
+  };
 
   return (
     <div
@@ -223,24 +281,31 @@ export function ChatApp() {
               sources you can open.
             </p>
           )}
+          {heroCollapsed && (
+            <button
+              type="button"
+              onClick={startNewQuestion}
+              disabled={busy}
+              style={{
+                marginTop: "0.55rem",
+                border: "none",
+                background: "transparent",
+                color: "var(--brand-700)",
+                fontFamily: "inherit",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                cursor: busy ? "not-allowed" : "pointer",
+                textDecoration: "underline",
+                textUnderlineOffset: "3px",
+              }}
+            >
+              Start a new question
+            </button>
+          )}
         </header>
 
         <div className="animate-rise-delay">
-          <form
-            onSubmit={onSubmit}
-            style={{
-              width: "100%",
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
-              gap: "0.65rem",
-              alignItems: "end",
-              padding: "0.75rem",
-              borderRadius: 16,
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              boxShadow: "var(--shadow)",
-            }}
-          >
+          <form onSubmit={onSubmit} style={composerStyle}>
             <textarea
               ref={inputRef}
               value={input}
@@ -255,17 +320,7 @@ export function ChatApp() {
               placeholder="Ask about furnaces, slides, shore power, boondocking…"
               disabled={busy}
               aria-label="Your RV question"
-              style={{
-                resize: "none",
-                border: "none",
-                outline: "none",
-                background: "transparent",
-                fontFamily: "inherit",
-                fontSize: "1rem",
-                lineHeight: 1.45,
-                color: "var(--ink)",
-                padding: "0.45rem 0.55rem",
-              }}
+              style={textareaStyle}
             />
             <button
               type="submit"
@@ -382,6 +437,65 @@ export function ChatApp() {
             >
               Searching RV sources…
             </p>
+          )}
+
+          {hasAssistantReply && !busy && (
+            <div
+              className="animate-rise"
+              style={{
+                marginTop: "0.25rem",
+                paddingTop: "0.85rem",
+                borderTop: "1px solid #e5e7eb",
+              }}
+            >
+              <p
+                style={{
+                  margin: "0 0 0.55rem",
+                  fontSize: "0.86rem",
+                  color: "var(--ink-soft)",
+                  fontWeight: 500,
+                }}
+              >
+                Not quite what you needed? Add detail or ask a follow-up.
+              </p>
+              <form onSubmit={onFollowUpSubmit} style={composerStyle}>
+                <textarea
+                  ref={followUpRef}
+                  value={followUp}
+                  onChange={(e) => setFollowUp(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void ask(followUp, { followUp: true });
+                    }
+                  }}
+                  rows={2}
+                  placeholder="e.g. mine is an SF-35, or what about the sail switch?"
+                  disabled={busy}
+                  aria-label="Follow-up or clarifying question"
+                  style={textareaStyle}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !followUp.trim()}
+                  style={{
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "0.85rem 1.15rem",
+                    background: busy ? "#93c5fd" : "var(--brand-600)",
+                    color: "#fff",
+                    fontFamily: "inherit",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                    cursor:
+                      busy || !followUp.trim() ? "not-allowed" : "pointer",
+                    opacity: !followUp.trim() ? 0.55 : 1,
+                  }}
+                >
+                  Follow up
+                </button>
+              </form>
+            </div>
           )}
         </section>
 

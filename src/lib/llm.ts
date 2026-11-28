@@ -1,4 +1,4 @@
-import type { Citation, SearchHit } from "./types";
+import type { ChatHistoryTurn, Citation, SearchHit } from "./types";
 import { stripTrailingSourcesSection } from "./citations";
 import { resolveLlm } from "./config";
 import { timeoutSignal } from "./fetchTimeout";
@@ -9,13 +9,30 @@ Always interpret questions in an RV / camping / travel-trailer / motorhome conte
 (e.g. "suburban furnace" means Suburban RV furnace, not a residential home HVAC unit).
 Write concise, practical answers. Use ONLY the provided source URLs for citations—
 never invent links. Cite sources inline as [1], [2], etc. matching the numbered list.
+When prior conversation is provided, treat the latest user message as a follow-up or
+clarification of that thread—do not ignore earlier details the user already gave.
 If sources are thin, say what is uncertain. Do not republish entire manuals.
 Do NOT append a Sources / References list at the end — cite inline only.`;
 
 const GEMINI_ATTEMPT_MS = 10_000;
 const OPENAI_ATTEMPT_MS = 15_000;
 
-function buildUserPrompt(question: string, rewritten: string, hits: SearchHit[]): string {
+function formatHistory(history: ChatHistoryTurn[]): string {
+  if (history.length === 0) return "";
+  const lines = history.map((t) => {
+    const who = t.role === "user" ? "User" : "Assistant";
+    const text = t.content.trim().slice(0, 1200);
+    return `${who}: ${text}`;
+  });
+  return `Prior conversation (latest message is a follow-up/clarification):\n${lines.join("\n\n")}\n\n`;
+}
+
+function buildUserPrompt(
+  question: string,
+  rewritten: string,
+  hits: SearchHit[],
+  history: ChatHistoryTurn[] = [],
+): string {
   const sources = hits
     .map(
       (h, i) =>
@@ -23,7 +40,9 @@ function buildUserPrompt(question: string, rewritten: string, hits: SearchHit[])
     )
     .join("\n\n");
 
-  return `User question: ${question}
+  const historyBlock = formatHistory(history);
+
+  return `${historyBlock}User question: ${question}
 RV-context search query used: ${rewritten}
 
 Sources (cite only these URLs, using matching [n] markers inline):
@@ -180,11 +199,12 @@ export async function generateAnswer(
   question: string,
   rewritten: string,
   hits: SearchHit[],
+  history: ChatHistoryTurn[] = [],
 ): Promise<{ answer: string; citations: Citation[] }> {
   const llm = resolveLlm();
   if (llm === "none") throw new Error("No LLM API key configured");
 
-  const prompt = buildUserPrompt(question, rewritten, hits);
+  const prompt = buildUserPrompt(question, rewritten, hits, history);
   let answer: string;
 
   if (llm === "gemini") {

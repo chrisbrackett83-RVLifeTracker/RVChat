@@ -1,3 +1,5 @@
+import type { ChatHistoryTurn } from "./types";
+
 const RV_BRAND_HINTS: Array<{ pattern: RegExp; rewrite: string }> = [
   { pattern: /\bsuburban\b/i, rewrite: "Suburban RV furnace" },
   { pattern: /\bdometic\b/i, rewrite: "Dometic RV" },
@@ -36,4 +38,26 @@ export function rewriteQueryForRv(question: string): string {
   }
 
   return rewritten;
+}
+
+/**
+ * Build a search query that keeps prior user asks so short follow-ups
+ * ("what about the sail switch?", "mine is an SF-35") still retrieve RV-relevant hits.
+ */
+export function rewriteQueryWithHistory(
+  question: string,
+  history: ChatHistoryTurn[] = [],
+): string {
+  const priorUser = history
+    .filter((t) => t.role === "user")
+    .map((t) => t.content.trim())
+    .filter(Boolean)
+    .slice(-3);
+
+  if (priorUser.length === 0) return rewriteQueryForRv(question);
+
+  const combined = [...priorUser, question.trim()]
+    .filter(Boolean)
+    .join(" — ");
+  return rewriteQueryForRv(combined);
 }

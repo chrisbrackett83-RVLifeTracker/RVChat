@@ -1,5 +1,11 @@
 export type ChatRole = "user" | "assistant";
 
+/** Prior turns sent with a follow-up so search + LLM keep context. */
+export type ChatHistoryTurn = {
+  role: ChatRole;
+  content: string;
+};
+
 export type Citation = {
   title: string;
   url: string;
